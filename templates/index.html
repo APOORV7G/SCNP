@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H Section Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        h1 { color: #007BFF; }
+        .chat { width: 80%; max-width: 800px; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fff; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); }
+        .messages { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+        .messages p { margin: 5px 0; }
+        form { display: flex; gap: 10px; }
+        input[type="text"], input[type="file"] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }
+        button { padding: 8px 15px; background-color: #007BFF; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+    </style>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+            const messagesDiv = document.querySelector('.messages');
+            const form = document.querySelector('form');
+            const input = document.querySelector('input[name="message"]');
+            const fileInput = document.querySelector('input[name="file"]');
+            const sendFileBtn = document.querySelector('button[name="sendFile"]');
+
+            // New logic to handle username
+            const storedUsername = localStorage.getItem('chatUsername');
+            let username = storedUsername;
+
+            // Function to prompt for username
+            function promptUsername(message = "Enter a unique username:") {
+                username = prompt(message);
+                while (!username || username.trim() === "") {
+                    username = prompt("Username cannot be empty. Please enter a unique username:");
+                }
+                localStorage.setItem('chatUsername', username);
+                return username;
+            }
+
+            // If no stored username or it's empty, prompt immediately
+            if (!username) {
+                username = promptUsername();
+            }
+
+            // Send username to server for validation
+            socket.emit('validate_username', { username: username });
+
+            // Handle username validation response
+            socket.on('username_validation', (data) => {
+                if (!data.is_valid) {
+                    // If username is invalid, prompt for a new one
+                    username = promptUsername(data.message || "Username is already taken. Please choose another:");
+                    socket.emit('validate_username', { username: username });
+                }
+            });
+
+            socket.on('new_message', (message) => {
+                const p = document.createElement('p');
+                if (message.type === "file") {
+                    p.innerHTML = `<strong>${message.username}:</strong> <a href="${message.url}" target="_blank">${message.filename}</a>`;
+                } else {
+                    p.innerHTML = `<strong>${message.username}:</strong> ${message.text}`;
+                }
+                messagesDiv.appendChild(p);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            });
+
+            socket.on('error_message', (error) => {
+                alert(error);
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const message = input.value.trim();
+                if (message) {
+                    socket.emit('send_message', { username, message });
+                    input.value = '';
+                }
+            });
+
+            sendFileBtn.addEventListener('click', () => {
+                const file = fileInput.files[0];
+                if (file) {
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("username", username);
+
+                    fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    }).then(response => response.json()).then(data => {
+                        if (data.success) {
+                            socket.emit('send_file', { username, filename: data.filename, url: data.url });
+                        } else {
+                            alert("File upload failed.");
+                        }
+                    });
+                    fileInput.value = "";
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>H Section Chat</h1>
+    <div class="chat">
+        <div class="messages">
+            {% for msg in messages %}
+                {% if msg.type == "file" %}
+                    <p><strong>{{ msg.username }}:</strong> <a href="{{ msg.url }}" target="_blank">{{ msg.filename }}</a></p>
+                {% else %}
+                    <p><strong>{{ msg.username }}:</strong> {{ msg.text }}</p>
+                {% endif %}
+            {% endfor %}
+        </div>
+        <form>
+            <input type="text" name="message" placeholder="Type your message here..." required>
+            <button type="submit">Send</button>
+        </form>
+        <input type="file" name="file">
+        <button name="sendFile">Upload & Send File</button>
+    </div>
+</body>
+</html>
