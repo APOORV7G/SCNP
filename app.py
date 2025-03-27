@@ -141,39 +141,38 @@ def validate_username(data):
 
 
 @socketio.on('send_message')
-def handle_message(data):
-    user_ip = request.remote_addr
-    username = user_data.get(user_ip, "Unknown")
+def handle_send_message(data):
+    username = user_data.get(request.remote_addr, 'Unknown')
+    text = data.get('text')
 
-    message_text = data.get("message", "").strip()
-    # Truncate long messages
-    if len(message_text) > 50:
-        message_text = message_text[:50] + "..."
+    if text is None or not text.strip():  # Check for None and empty string
+        print('Empty or None message, skipping broadcast')
+        return
 
-    message_data = {"username": username, "text": message_text, "type": "text"}
-    messages.append(message_data)
+    socketio.emit('new_message', {
+        'username': username,
+        'text': text,
+        'type': 'text'
+    })
 
-    logger.info(f"Message from {username}: {message_text}")
-
-    emit('new_message', message_data, broadcast=True)
 
 
 @socketio.on('send_file')
-def handle_file(data):
-    user_ip = request.remote_addr
-    username = user_data.get(user_ip, "Unknown")
+def handle_send_file(data):
+    username = user_data.get(request.remote_addr, 'Unknown')
+    filename = data.get('filename')
+    url = data.get('url')
 
-    message_data = {
-        "username": username,
-        "filename": data["filename"],
-        "url": data["url"],
-        "type": "file"
-    }
-    messages.append(message_data)
+    if not filename:  # Skip if filename is empty
+        print('Filename is empty, skipping broadcast')
+        return
 
-    logger.info(f"File sent by {username}: {data['filename']}")
-
-    emit('new_message', message_data, broadcast=True)
+    socketio.emit('new_message', {
+        'username': username,
+        'filename': filename,
+        'url': url,
+        'type': 'file'
+    })
 
 
 if __name__ == '__main__':
