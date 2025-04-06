@@ -15,7 +15,7 @@
         button { padding: 8px 15px; background-color: #007BFF; color: white; border: none; border-radius: 3px; cursor: pointer; }
         button:hover { background-color: #0056b3; }
     </style>
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='index.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const socket = io();
