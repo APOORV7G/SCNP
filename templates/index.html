@@ -1,19 +1,115 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>H Section Chat</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SCNP Chat</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        h1 { color: #007BFF; }
-        .chat { width: 80%; max-width: 800px; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fff; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); }
-        .messages { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-        .messages p { margin: 5px 0; }
-        form { display: flex; gap: 10px; }
-        input[type="text"], input[type="file"] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 3px; }
-        button { padding: 8px 15px; background-color: #007BFF; color: white; border: none; border-radius: 3px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            color: #007BFF;
+        }
+
+        .chat {
+            width: 80%;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message {
+            margin: 5px 0;
+            padding: 8px 12px;
+            border-radius: 15px;
+            max-width: 70%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+        }
+
+        .message-container {
+            display: flex;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+
+        .my-message-container {
+            justify-content: flex-end;
+        }
+
+        .other-message-container {
+            justify-content: flex-start;
+        }
+
+        .my-message {
+            background-color: #4CAF50;
+            /* Green color */
+            color: white;
+            border-top-right-radius: 5px;
+        }
+
+        .other-message {
+            background-color: #2196F3;
+            /* Blue color */
+            color: white;
+            border-top-left-radius: 5px;
+        }
+
+        .username {
+            font-size: 1.1em;
+            margin-bottom: 3px;
+            font-weight: bold;
+        }
+
+        form {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"],
+        input[type="file"] {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
     </style>
     <script src="{{ url_for('static', filename='index.js') }}"></script>
     <script>
@@ -36,12 +132,16 @@
                     username = prompt("Username cannot be empty. Please enter a unique username:");
                 }
                 localStorage.setItem('chatUsername', username);
+                document.cookie = `chatUsername=${username}; path=/; max-age=31536000`; // Store in cookie for 1 year
                 return username;
             }
 
             // If no stored username or it's empty, prompt immediately
             if (!username) {
                 username = promptUsername();
+            } else {
+                // Make sure to set the cookie when loading from localStorage
+                document.cookie = `chatUsername=${username}; path=/; max-age=31536000`;
             }
 
             // Send username to server for validation
@@ -57,13 +157,34 @@
             });
 
             socket.on('new_message', (message) => {
-                const p = document.createElement('p');
+                const messageContainer = document.createElement('div');
+                const isMyMessage = message.username === username;
+
+                messageContainer.className = `message-container ${isMyMessage ? 'my-message-container' : 'other-message-container'}`;
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isMyMessage ? 'my-message' : 'other-message'}`;
+
+                const usernameDiv = document.createElement('div');
+                usernameDiv.className = 'username';
+                usernameDiv.textContent = message.username;
+
+                const contentDiv = document.createElement('div');
+
                 if (message.type === "file") {
-                    p.innerHTML = `<strong>${message.username}:</strong> <a href="${message.url}" target="_blank">${message.filename}</a>`;
+                    const fileLink = document.createElement('a');
+                    fileLink.href = message.url;
+                    fileLink.target = "_blank";
+                    fileLink.textContent = message.filename;
+                    contentDiv.appendChild(fileLink);
                 } else {
-                    p.innerHTML = `<strong>${message.username}:</strong> ${message.text}`;
+                    contentDiv.textContent = message.text;
                 }
-                messagesDiv.appendChild(p);
+
+                messageDiv.appendChild(usernameDiv);
+                messageDiv.appendChild(contentDiv);
+                messageContainer.appendChild(messageDiv);
+                messagesDiv.appendChild(messageContainer);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             });
 
@@ -100,27 +221,86 @@
                     fileInput.value = "";
                 }
             });
+
+            // Format existing messages based on current username
+            const formatExistingMessages = () => {
+                document.querySelectorAll('.message-container').forEach(container => {
+                    const usernameDiv = container.querySelector('.username');
+                    if (usernameDiv) {
+                        const messageUsername = usernameDiv.textContent;
+                        const isMyMessage = messageUsername === username;
+
+                        container.className = `message-container ${isMyMessage ? 'my-message-container' : 'other-message-container'}`;
+                        const messageDiv = container.querySelector('.message');
+                        if (messageDiv) {
+                            messageDiv.className = `message ${isMyMessage ? 'my-message' : 'other-message'}`;
+                        }
+                    }
+                });
+            };
+
+            // Run once on page load
+            formatExistingMessages();
         });
     </script>
 </head>
+
 <body>
-    <h1>H Section Chat</h1>
+    <h1>SCNP Chat</h1>
     <div class="chat">
         <div class="messages">
             {% for msg in messages %}
-                {% if msg.type == "file" %}
-                    <p><strong>{{ msg.username }}:</strong> <a href="{{ msg.url }}" target="_blank">{{ msg.filename }}</a></p>
-                {% else %}
-                    <p><strong>{{ msg.username }}:</strong> {{ msg.text }}</p>
-                {% endif %}
+            <div class="message-container">
+                <div class="message">
+                    <div class="username">{{ msg.username }}</div>
+                    <div>
+                        {% if msg.type == "file" %}
+                        <a href="{{ msg.url }}" target="_blank">{{ msg.filename }}</a>
+                        {% else %} {{ msg.text }} {% endif %}
+                    </div>
+                </div>
+            </div>
             {% endfor %}
         </div>
-        <form>
-            <input type="text" name="message" placeholder="Type your message here..." required>
+        <form autocomplete="off">
+            <input type="text" name="message" placeholder="Type your message here..." required />
             <button type="submit">Send</button>
         </form>
-        <input type="file" name="file">
+        <input type="file" name="file" />
         <button name="sendFile">Upload & Send File</button>
     </div>
+
+    <script>
+        // This extra script runs immediately to format messages before the DOM content loaded event
+        (function () {
+            // Get username from cookie or localStorage
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+                return null;
+            }
+
+            const username = getCookie('chatUsername') || localStorage.getItem('chatUsername');
+
+            if (username) {
+                // Format all message containers based on username
+                document.querySelectorAll('.message-container').forEach(container => {
+                    const usernameDiv = container.querySelector('.username');
+                    if (usernameDiv) {
+                        const messageUsername = usernameDiv.textContent;
+                        const isMyMessage = messageUsername === username;
+
+                        container.className = `message-container ${isMyMessage ? 'my-message-container' : 'other-message-container'}`;
+                        const messageDiv = container.querySelector('.message');
+                        if (messageDiv) {
+                            messageDiv.className = `message ${isMyMessage ? 'my-message' : 'other-message'}`;
+                        }
+                    }
+                });
+            }
+        })();
+    </script>
 </body>
+
 </html>

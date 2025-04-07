@@ -147,8 +147,8 @@ def handle_message(data):
 
     message_text = data.get("message", "").strip()
     # Truncate long messages
-    if len(message_text) > 50:
-        message_text = message_text[:50] + "..."
+    if len(message_text) > 16383:
+        message_text = message_text[:16,383] + "... {Truncated}"
 
     message_data = {"username": username, "text": message_text, "type": "text"}
     messages.append(message_data)
