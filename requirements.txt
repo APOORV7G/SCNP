@@ -1,0 +1,6 @@
+Flask
+flask-socketio
+python-socketio
+python-engineio
+eventlet
+pytest
